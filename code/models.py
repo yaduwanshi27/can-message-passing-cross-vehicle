@@ -80,3 +80,40 @@ def edge_change_fraction(src, dst, dst2):
             common += min(cc, d.get(kk, 0))
         fr.append(1 - common / 63.0)
     return float(np.mean(fr))
+
+
+# ---------------- v1.2 extension: attention-based message passing (STAGE2_DESIGN_ADDENDUM_v1.2_GAT) ----------------
+class GATLayer(nn.Module):
+    """Same layer form as SAGELayer: out = Theta_s h_v + sum_u alpha_uv Theta_n h_u, with multi-head attention over the observed
+    incoming transitions u->v:  alpha_uv = softmax_u( LeakyReLU_0.2(a_src.Theta_n h_u + a_dst.Theta_n h_v) + log A_uv ).
+    With a = 0 this reduces exactly to SAGELayer's transition-weighted mean (log A_uv keeps the multiplicities).
+    Nodes with no incoming transition receive a zero neighbour message (as SAGELayer)."""
+    def __init__(self, i, o, heads=4):
+        super().__init__()
+        assert o % heads == 0
+        self.k = heads; self.d = o // heads
+        self.self_lin = nn.Linear(i, o); self.nei_lin = nn.Linear(i, o, bias=False)
+        self.a_src = nn.Parameter(torch.zeros(heads, self.d)); self.a_dst = nn.Parameter(torch.zeros(heads, self.d))
+        nn.init.xavier_uniform_(self.a_src); nn.init.xavier_uniform_(self.a_dst)
+    def forward(self, H, A):
+        B, N, _ = H.shape
+        Wh = self.nei_lin(H).view(B, N, self.k, self.d)                      # (B,N,K,d)
+        es = (Wh * self.a_src).sum(-1); ed = (Wh * self.a_dst).sum(-1)       # (B,N,K)
+        logits = torch.nn.functional.leaky_relu(es.unsqueeze(2) + ed.unsqueeze(1), 0.2)   # (B,u,v,K)
+        edge = (A > 0).unsqueeze(-1)
+        logits = logits + torch.log(A.clamp(min=1e-12)).unsqueeze(-1)
+        logits = logits.masked_fill(~edge, -1e9)
+        alpha = torch.softmax(logits, dim=1) * edge.float()                  # softmax over sources u; zero where no edge
+        msg = torch.einsum('buvk,bukd->bvkd', alpha, Wh).reshape(B, N, self.k * self.d)
+        return self.self_lin(H) + msg
+
+class GAT(nn.Module):
+    def __init__(self, f, h, g, drop=0.0, heads=4):
+        super().__init__()
+        self.l1 = GATLayer(f, h, heads); self.l2 = GATLayer(h, h, heads); self.drop = nn.Dropout(drop)
+        self.head = Head(h, g, drop)
+    def forward(self, b):
+        A = b['adj']; m = b['nmask'].unsqueeze(-1).float()
+        H = torch.relu(self.l1(b['node'], A)) * m
+        H = torch.relu(self.l2(self.drop(H), A)) * m
+        return self.head(H, b['nmask'], b['glob'])
