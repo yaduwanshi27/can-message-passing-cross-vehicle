@@ -10,10 +10,10 @@ The experiments use **can-train-and-test v1** (B. Lampe, DTU Data, doi:[10.11583
 ## Repository layout
 | Folder | Contents |
 |---|---|
-| `protocol/` | The design frozen before any test partition was read (`STAGE2_DESIGN_FROZEN_v1.0.md`, 2026-09-17) and its amendment (`v1.1`), also fixed before test data were read. |
+| `protocol/` | The design frozen before any test partition was read (`STAGE2_DESIGN_FROZEN_v1.0.md`, 2026-09-17) and its amendment (`v1.1`), also fixed before test data were read, plus the extension addendum `STAGE2_DESIGN_ADDENDUM_v1.2_GAT.md` (2026-09-22), frozen before the extension run but after the original results were known. |
 | `audit/` | The dataset integrity audit (duplicates, partition checks, exclusion of set_01/test_04) and the file manifest with SHA-256 digests. |
-| `code/` | Python modules: identity-free features (`feats.py`), models (`models.py`), tuning (`exp_tune.py`), final training (`exp_final.py`), test scoring (`exp_eval.py`), statistics (`exp_stats.py`), recording-level exact-enumeration audit (`exp_audit.py`), result package (`exp_package.py`), and the sensitivity analyses at other window lengths (`featsW.py`, `modelsW.py`, `exp_robust.py`, `robust_stats.py`). |
-| `notebooks/` | The Kaggle notebooks exactly as run, in order k00 to k08. |
+| `code/` | Python modules: identity-free features (`feats.py`), models (`models.py`), tuning (`exp_tune.py`), final training (`exp_final.py`), test scoring (`exp_eval.py`), statistics (`exp_stats.py`), recording-level exact-enumeration audit (`exp_audit.py`), result package (`exp_package.py`), the sensitivity analyses at other window lengths (`featsW.py`, `modelsW.py`, `exp_robust.py`, `robust_stats.py`), and the attention-based extension (`GATLayer`/`GAT` in `models.py`, `exp_gat.py`, `gat_stats.py`). |
+| `notebooks/` | The Kaggle notebooks exactly as run, in order k00 to k09. |
 
 ## Reproducing the results
 The notebooks were run on Kaggle (2× NVIDIA Tesla T4, Python 3.12, PyTorch 2.10.0 with CUDA 12.8, the Kaggle image's LightGBM). Run them in order:
@@ -27,8 +27,9 @@ The notebooks were run on Kaggle (2× NVIDIA Tesla T4, Python 3.12, PyTorch 2.10
 7. `k06` — exact enumeration of the attack-family-stratified recording bootstrap.
 8. `k07` — result tables.
 9. `k08` — pre-specified sensitivity analyses (payload-length ablation, window lengths 32 and 128, in-span negatives).
+10. `k09` — extension analysis: attention-based aggregation (GAT and its rewired control) on the unknown-vehicle cells, under the rules of `protocol/STAGE2_DESIGN_ADDENDUM_v1.2_GAT.md`. This analysis was specified after the original results were known and frozen before it was run; it reuses the k03 folds and the k05 evaluation windows, both verified by assertion, and retunes no original model.
 
-Approximate GPU time: tuning 1.05 h, final training 0.53 h, test scoring 0.38 h, sensitivity analyses 2.93 h.
+Approximate GPU time: tuning 1.05 h, final training 0.53 h, test scoring 0.38 h, sensitivity analyses 2.93 h, extension analysis 2.18 h (T4×2, wall clock 7,832 s).
 
 ## Licence
 Code: MIT Licence (`LICENSE`). Documents: CC BY 4.0.
